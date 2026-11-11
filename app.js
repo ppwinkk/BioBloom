@@ -41,8 +41,14 @@ function record(){const s=state.sim[state.selected];state.hist[state.selected].p
 function reset(){const b=stage();state.sim[b.id]={...b.base,recorded_at:new Date().toISOString()};save();render()}
 function configFromForm(){const url=$('url').value.trim().replace(/\/+$/,'');const key=$('apikey').value.trim();const codes=Object.fromEntries(BINS.map(b=>[b.id,$('code-'+b.id).value.trim()]));if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url))throw Error('Project URL ต้องอยู่ในรูป https://project.supabase.co');if(!key||/service_role|sb_secret_/i.test(key))throw Error('ต้องใช้ Publishable / anon key เท่านั้น');if(new Set(Object.values(codes)).size!==3||Object.values(codes).some(v=>!v))throw Error('รหัสบอร์ดทั้ง 3 ถังต้องไม่ว่างและไม่ซ้ำกัน');return{url,key,codes}}
 function message(text){$('connection-message').textContent=text}
-function cleanCode(value){return String(value??'').trim().toUpperCase().replace(/\s+/g,'')}
-function matchBin(bins,code){return bins.find(x=>cleanCode(x.device_code)===cleanCode(code))}
+function cleanCode(value) {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+}function matchBin(bins,code){return bins.find(x=>cleanCode(x.device_code)===cleanCode(code))}
 function reqHeaders(key){const h={apikey:key,Accept:'application/json'};if(!key.startsWith('sb_publishable_'))h.Authorization='Bearer '+key;return h}
 async function get(cfg,path){const response=await fetch(cfg.url+'/rest/v1/'+path,{headers:reqHeaders(cfg.key),cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status+': '+(await response.text()).slice(0,180));return await response.json()}
 async function test(){try{const c=configFromForm();message('กำลังทดสอบเชื่อมต่อ...');const bins=await get(c,'bins?select=id,device_code,name&limit=100');const count=BINS.filter(b=>Boolean(matchBin(bins,c.codes[b.id]))).length;const found=bins.map(x=>cleanCode(x.device_code)).filter(Boolean);const wanted=BINS.map(b=>cleanCode(c.codes[b.id]));message('เชื่อมต่อสำเร็จ พบ '+count+'/3 รหัสบอร์ด'+(count<3?' | รหัสจาก Supabase: '+(found.join(', ')||'(ไม่มีแถว)')+' | รหัสในเว็บ: '+wanted.join(', '):' | รหัสตรงกันครบแล้ว'))}catch(e){message('เชื่อมต่อไม่สำเร็จ: '+e.message)}}
